@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>asmplay</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#15171c"/>
+  <rect x="18" y="18" width="28" height="28" rx="6" fill="none" stroke="#4a4e59" stroke-width="2.5"/>
+  <path d="M 24 12 V 18 M 32 12 V 18 M 40 12 V 18 M 24 46 V 52 M 32 46 V 52 M 40 46 V 52 M 12 24 H 18 M 12 32 H 18 M 12 40 H 18 M 46 24 H 52 M 46 32 H 52 M 46 40 H 52" stroke="#4a4e59" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="5" fill="#69db7c"/>
+</svg>
