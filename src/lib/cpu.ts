@@ -39,6 +39,20 @@ export function createCpu(): Cpu {
   };
 }
 
+// 状態を丸ごと複製する。1命令戻る(履歴)機能で、ステップ前の状態を控えておく用。
+export function cloneCpu(cpu: Cpu): Cpu {
+  return {
+    regs: cpu.regs.slice(),
+    mem: cpu.mem.slice(),
+    pc: cpu.pc,
+    zero: cpu.zero,
+    lt: cpu.lt,
+    halted: cpu.halted,
+    output: [...cpu.output],
+    steps: cpu.steps,
+  };
+}
+
 function resolveAddr(cpu: Cpu, addr: Address): number {
   return addr.kind === 'direct' ? addr.addr : (cpu.regs[addr.reg] ?? 0);
 }
