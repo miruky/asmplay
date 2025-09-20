@@ -55,13 +55,34 @@ export class MachineView {
     }
 
     const memGrid = host.querySelector('#mem-grid') as HTMLElement;
-    for (let i = 0; i < 256; i += 1) {
-      const cell = document.createElement('span');
-      cell.className = 'mem-cell';
-      cell.title = `番地 ${i} (0x${i.toString(16).padStart(2, '0')})`;
-      memGrid.append(cell);
-      if ((i + 1) % MEM_COLS === 0) memGrid.append(document.createElement('br'));
-      this.memCells.push(cell);
+    // 列見出し(下位ニブル 0〜f)。左端は番地ガターのぶん空ける。
+    const head = document.createElement('div');
+    head.className = 'mem-row mem-head';
+    head.append(document.createElement('span'));
+    for (let c = 0; c < MEM_COLS; c += 1) {
+      const col = document.createElement('span');
+      col.className = 'mem-colhead';
+      col.textContent = c.toString(16);
+      head.append(col);
+    }
+    memGrid.append(head);
+    // 16セルごとに行を作り、行頭に上位ニブルの番地を置く。
+    for (let row = 0; row < 256 / MEM_COLS; row += 1) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'mem-row';
+      const addr = document.createElement('span');
+      addr.className = 'mem-addr';
+      addr.textContent = `${(row * MEM_COLS).toString(16).padStart(2, '0')}`;
+      rowEl.append(addr);
+      for (let c = 0; c < MEM_COLS; c += 1) {
+        const i = row * MEM_COLS + c;
+        const cell = document.createElement('span');
+        cell.className = 'mem-cell';
+        cell.title = `番地 ${i} (0x${i.toString(16).padStart(2, '0')})`;
+        rowEl.append(cell);
+        this.memCells.push(cell);
+      }
+      memGrid.append(rowEl);
     }
 
     this.pcEl = host.querySelector('#pc-view') as HTMLElement;
@@ -98,13 +119,18 @@ export class MachineView {
       cell.textContent = value.toString(16).padStart(2, '0');
       cell.classList.toggle('nonzero', value !== 0);
       cell.classList.toggle('changed', change?.mem === i);
+      // 値の大きさを淡い背景の濃さで表す(0は無地)。どこにデータが溜まっているか俯瞰できる。
+      cell.style.setProperty('--fill', value === 0 ? '0' : (0.1 + 0.3 * (value / 255)).toFixed(3));
     });
     this.pcEl.textContent = `pc=${cpu.pc}`;
     this.flagsEl.textContent = `zero=${cpu.zero ? 1 : 0} lt=${cpu.lt ? 1 : 0}`;
     this.stateEl.textContent = cpu.halted ? `停止(${cpu.steps}ステップ実行)` : '実行可能';
     this.outputEl.textContent = cpu.output.join(', ');
     this.listingRows.forEach((row, i) => {
-      row.classList.toggle('current', !cpu.halted && i === cpu.pc);
+      const current = !cpu.halted && i === cpu.pc;
+      row.classList.toggle('current', current);
+      // 長いプログラムでも実行位置を見失わないよう、現在行を可視域へ送る。
+      if (current) row.scrollIntoView({ block: 'nearest' });
     });
   }
 }
