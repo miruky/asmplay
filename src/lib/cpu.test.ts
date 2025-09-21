@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assemble, type Program } from './asm';
-import { createCpu, run, step } from './cpu';
+import { cloneCpu, createCpu, run, step } from './cpu';
 
 function programOf(source: string): Program {
   const { program, errors } = assemble(source);
@@ -115,5 +115,24 @@ describe('変更通知', () => {
     expect(step(cpu, program)?.mem).toBe(9);
     expect(step(cpu, program)?.jumped).toBe(true);
     expect(cpu.pc).toBe(4);
+  });
+});
+
+describe('複製', () => {
+  it('cloneCpuは独立した複製を返し、元を書き換えても影響しない', () => {
+    const cpu = createCpu();
+    const program = programOf('mov r0, 9\nstore r0, [3]\nout r0\nhalt');
+    step(cpu, program);
+    step(cpu, program);
+    const snapshot = cloneCpu(cpu);
+    // 複製後に元を進めても、控えた状態は当時のまま
+    step(cpu, program);
+    step(cpu, program);
+    expect(snapshot.regs[0]).toBe(9);
+    expect(snapshot.mem[3]).toBe(9);
+    expect(snapshot.output).toEqual([]);
+    expect(snapshot.pc).toBe(2);
+    expect(cpu.output).toEqual([9]);
+    expect(cpu.regs).not.toBe(snapshot.regs);
   });
 });
