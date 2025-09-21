@@ -3,9 +3,13 @@
 
 import './style.css';
 import { assemble, type Program } from './lib/asm';
-import { createCpu, step, type Cpu } from './lib/cpu';
+import { cloneCpu, createCpu, step, type Cpu } from './lib/cpu';
 import { sampleById, samples } from './lib/samples';
+import { loadSource, loadSpeed, saveSource, saveSpeed } from './lib/storage';
 import { MachineView } from './ui/machineview';
+
+// 1命令戻る用に控える状態の上限。長時間の実行でも記憶が際限なく増えないようにする。
+const MAX_HISTORY = 4096;
 
 const BRAND_MARK = `
   <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
@@ -44,6 +48,7 @@ app.innerHTML = `
         <textarea id="asm-input" class="asm-input" spellcheck="false" autocomplete="off"></textarea>
         <div class="editor-actions">
           <button type="button" class="button button-primary" id="build-button">組み立てる</button>
+          <button type="button" class="button" id="back-button" disabled>戻る</button>
           <button type="button" class="button" id="step-button">1命令</button>
           <button type="button" class="button" id="run-button">実行</button>
           <button type="button" class="button" id="reset-button">リセット</button>
@@ -91,7 +96,9 @@ const view = new MachineView(document.getElementById('machine-host') as HTMLElem
 let cpu: Cpu = createCpu();
 let program: Program | null = null;
 let timer: number | null = null;
+const history: Cpu[] = [];
 const runButton = document.getElementById('run-button') as HTMLButtonElement;
+const backButton = document.getElementById('back-button') as HTMLButtonElement;
 
 function pause(): void {
   if (timer !== null) {
@@ -99,6 +106,10 @@ function pause(): void {
     timer = null;
   }
   runButton.textContent = '実行';
+}
+
+function refreshControls(): void {
+  backButton.disabled = history.length === 0;
 }
 
 function showErrors(errors: { line: number; message: string }[]): void {
@@ -116,23 +127,42 @@ function build(): void {
   showErrors(result.errors);
   program = result.program;
   cpu = createCpu();
+  history.length = 0;
   view.setProgram(program, editor.value);
   view.update(cpu, null);
+  saveSource(editor.value);
+  refreshControls();
 }
 
 function stepOnce(): void {
   if (!program) build();
   if (!program || cpu.halted) return;
+  // 戻れるよう、進む前の状態を控える。上限を超えたら古いものから捨てる。
+  history.push(cloneCpu(cpu));
+  if (history.length > MAX_HISTORY) history.shift();
   const change = step(cpu, program);
   view.update(cpu, change);
+  refreshControls();
   if (cpu.halted) pause();
 }
+
+function stepBack(): void {
+  pause();
+  const previous = history.pop();
+  if (!previous) return;
+  cpu = previous;
+  view.update(cpu, null);
+  refreshControls();
+}
+
+const speedSelect = document.getElementById('speed-select') as HTMLSelectElement;
 
 document.getElementById('build-button')?.addEventListener('click', build);
 document.getElementById('step-button')?.addEventListener('click', () => {
   pause();
   stepOnce();
 });
+backButton.addEventListener('click', stepBack);
 
 runButton.addEventListener('click', () => {
   if (timer !== null) {
@@ -141,10 +171,7 @@ runButton.addEventListener('click', () => {
   }
   if (!program) build();
   if (!program || cpu.halted) return;
-  const speed = Number.parseInt(
-    (document.getElementById('speed-select') as HTMLSelectElement).value,
-    10,
-  );
+  const speed = Number.parseInt(speedSelect.value, 10);
   timer = window.setInterval(() => stepOnce(), 1000 / speed);
   runButton.textContent = '一時停止';
 });
@@ -152,7 +179,27 @@ runButton.addEventListener('click', () => {
 document.getElementById('reset-button')?.addEventListener('click', () => {
   pause();
   cpu = createCpu();
+  history.length = 0;
   view.update(cpu, null);
+  refreshControls();
+});
+
+speedSelect.addEventListener('change', () => {
+  saveSpeed(Number.parseInt(speedSelect.value, 10));
+});
+
+// エディタの外では矢印キーで前後の命令へ。学習中に手をマウスへ移さず追える。
+document.addEventListener('keydown', (event) => {
+  const tag = (event.target as HTMLElement | null)?.tagName;
+  if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return;
+  if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    pause();
+    stepOnce();
+  } else if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    stepBack();
+  }
 });
 
 editor.addEventListener('keydown', (event) => {
@@ -179,5 +226,7 @@ for (const button of app.querySelectorAll<HTMLButtonElement>('[data-sample]')) {
   });
 }
 
-editor.value = (samples[0] as { source: string }).source;
+// 前回の続きがあれば復元し、なければ最初のサンプルから始める。速度も引き継ぐ。
+speedSelect.value = String(loadSpeed(Number.parseInt(speedSelect.value, 10)));
+editor.value = loadSource() ?? (samples[0] as { source: string }).source;
 build();
