@@ -236,6 +236,17 @@ a:focus-visible {
   color: var(--accent);
 }
 
+.button:disabled {
+  color: var(--faint);
+  border-color: var(--rule);
+  cursor: not-allowed;
+}
+
+.button:disabled:hover {
+  color: var(--faint);
+  border-color: var(--rule);
+}
+
 .button-primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -408,20 +419,41 @@ a:focus-visible {
 .mem-grid {
   font-family: var(--mono);
   font-size: 0.72rem;
-  line-height: 2;
   letter-spacing: 0.02em;
   color: var(--faint);
 }
 
-.mem-cell {
-  display: inline-block;
-  width: 1.9em;
+.mem-row {
+  display: grid;
+  grid-template-columns: 2.4em repeat(16, 1fr);
+  align-items: center;
+}
+
+.mem-colhead {
   text-align: center;
+  font-size: 0.6rem;
+  color: var(--faint);
+  padding-bottom: 4px;
+}
+
+.mem-addr {
+  text-align: right;
+  padding-right: 10px;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+
+.mem-cell {
+  text-align: center;
+  line-height: 1.95;
   border-radius: 3px;
+  /* 値の大きさに比例した淡いアクセント地。0番地は無地のまま */
+  background: color-mix(in srgb, var(--accent) calc(var(--fill, 0) * 100%), transparent);
 }
 
 .mem-cell.nonzero {
-  color: var(--accent);
+  color: var(--text);
 }
 
 .listing {
@@ -502,9 +534,12 @@ a:focus-visible {
       border-color 160ms ease;
   }
 
-  .reg-cell.changed .reg-value,
-  .mem-cell.changed {
+  .reg-cell.changed .reg-value {
     animation: flash 640ms cubic-bezier(0.2, 0.6, 0.2, 1);
+  }
+
+  .mem-cell.changed {
+    animation: memflash 720ms cubic-bezier(0.2, 0.6, 0.2, 1);
   }
 
   .listing-row {
@@ -532,6 +567,14 @@ a:focus-visible {
   }
   100% {
     background: transparent;
+  }
+}
+
+/* 書き換わったメモリは一度アクセントで満たし、値の濃さのヒートマップへ沈める */
+@keyframes memflash {
+  0% {
+    background: var(--accent);
+    color: var(--bg);
   }
 }
 
