@@ -15,8 +15,10 @@ export class MachineView {
   private readonly outputEl: HTMLElement;
   private readonly listingEl: HTMLElement;
   private listingRows: HTMLElement[] = [];
+  private readonly onToggleBreakpoint?: (index: number, active: boolean) => void;
 
-  constructor(host: HTMLElement) {
+  constructor(host: HTMLElement, onToggleBreakpoint?: (index: number, active: boolean) => void) {
+    this.onToggleBreakpoint = onToggleBreakpoint;
     host.innerHTML = `
       <section class="panel" aria-label="レジスタ">
         <h2>レジスタ</h2>
@@ -37,7 +39,7 @@ export class MachineView {
       </section>
       <section class="panel" aria-label="出力">
         <h2>出力</h2>
-        <p class="output" id="output-view"></p>
+        <p class="output" id="output-view" aria-live="polite"></p>
       </section>`;
 
     const regGrid = host.querySelector('#reg-grid') as HTMLElement;
@@ -92,16 +94,35 @@ export class MachineView {
     this.listingEl = host.querySelector('#listing') as HTMLElement;
   }
 
-  // プログラムを組み立て直したときに、実行位置リストを作り直す
+  // プログラムを組み立て直したときに、実行位置リストを作り直す。
+  // 各行に行番号のガターを置き、そこをクリックするとブレークポイントを切り替える。
   setProgram(program: Program | null, source: string): void {
     this.listingEl.replaceChildren();
     this.listingRows = [];
     if (!program) return;
     const sourceLines = source.split('\n');
-    program.lines.forEach((lineNo) => {
+    program.lines.forEach((lineNo, index) => {
       const row = document.createElement('li');
       row.className = 'listing-row';
-      row.textContent = (sourceLines[lineNo - 1] ?? '').trim();
+
+      const gutter = document.createElement('button');
+      gutter.type = 'button';
+      gutter.className = 'bp';
+      gutter.setAttribute('aria-pressed', 'false');
+      gutter.setAttribute('aria-label', `${lineNo}行目のブレークポイント`);
+      gutter.textContent = `${lineNo}`;
+      gutter.addEventListener('click', () => {
+        const active = gutter.getAttribute('aria-pressed') !== 'true';
+        gutter.setAttribute('aria-pressed', String(active));
+        row.classList.toggle('breakpoint', active);
+        this.onToggleBreakpoint?.(index, active);
+      });
+
+      const code = document.createElement('span');
+      code.className = 'code';
+      code.textContent = (sourceLines[lineNo - 1] ?? '').trim();
+
+      row.append(gutter, code);
       this.listingEl.append(row);
       this.listingRows.push(row);
     });
