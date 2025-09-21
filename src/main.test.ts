@@ -58,4 +58,35 @@ describe('main', () => {
     const values = [...document.querySelectorAll('.reg-value')].map((el) => el.textContent);
     expect(values.every((text) => text?.startsWith('0 '))).toBe(true);
   });
+
+  const r0Text = () => document.querySelectorAll('.reg-value')[0]?.textContent ?? '';
+
+  it('戻るボタンで直前の状態へ戻り、履歴が尽きると無効化される', () => {
+    const editor = document.getElementById('asm-input') as HTMLTextAreaElement;
+    editor.value = 'mov r0, 5\nmov r0, 9\nhalt';
+    (document.getElementById('build-button') as HTMLButtonElement).click();
+    const back = document.getElementById('back-button') as HTMLButtonElement;
+    const stepButton = document.getElementById('step-button') as HTMLButtonElement;
+    expect(back.disabled).toBe(true);
+    stepButton.click();
+    expect(r0Text()).toContain('5');
+    expect(back.disabled).toBe(false);
+    stepButton.click();
+    expect(r0Text()).toContain('9');
+    back.click();
+    expect(r0Text()).toContain('5');
+    back.click();
+    expect(r0Text()).toMatch(/^0 /);
+    expect(back.disabled).toBe(true);
+  });
+
+  it('矢印キーで前後の命令へ進める', () => {
+    const editor = document.getElementById('asm-input') as HTMLTextAreaElement;
+    editor.value = 'mov r0, 7\nmov r0, 3\nhalt';
+    (document.getElementById('build-button') as HTMLButtonElement).click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(r0Text()).toContain('7');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    expect(r0Text()).toMatch(/^0 /);
+  });
 });
