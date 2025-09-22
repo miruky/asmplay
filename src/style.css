@@ -11,6 +11,7 @@
   --accent: #1f8a3b;
   --accent-wash: #1f8a3b14;
   --error: #c0392b;
+  --stop: #c0563b;
   --editor-bg: #10130f;
   --editor-text: #cfe0c9;
   --editor-rule: #2a3127;
@@ -30,6 +31,7 @@
     --accent: #5fd07a;
     --accent-wash: #5fd07a1f;
     --error: #e8857a;
+    --stop: #e0856a;
     --editor-bg: #0a0c09;
     --editor-text: #cfe0c9;
     --editor-rule: #232a20;
@@ -465,17 +467,63 @@ a:focus-visible {
 }
 
 .listing-row {
-  padding: 2px 10px;
+  display: grid;
+  grid-template-columns: 2.8em 1fr;
+  align-items: baseline;
   border-left: 2px solid transparent;
-  white-space: pre;
   color: var(--muted);
+}
+
+.listing-row .code {
+  white-space: pre;
+  padding: 2px 10px 2px 4px;
 }
 
 .listing-row.current {
   border-left-color: var(--accent);
   background: var(--accent-wash);
+}
+
+.listing-row.current .code {
   color: var(--text);
   font-weight: 600;
+}
+
+/* 行番号ガター兼ブレークポイントの切り替え。クリックでその行に停止点を置く */
+.bp {
+  font: inherit;
+  font-size: 0.68rem;
+  color: var(--faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: right;
+  padding: 2px 8px 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.bp:hover {
+  color: var(--accent);
+}
+
+.listing-row.breakpoint .bp {
+  color: var(--stop);
+  font-weight: 700;
+}
+
+.listing-row.breakpoint .bp::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--stop);
+  vertical-align: middle;
+}
+
+.listing-row.breakpoint {
+  border-left-color: var(--stop);
 }
 
 .output {

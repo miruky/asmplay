@@ -5,6 +5,7 @@ import './style.css';
 import { assemble, type Program } from './lib/asm';
 import { cloneCpu, createCpu, step, type Cpu } from './lib/cpu';
 import { sampleById, samples } from './lib/samples';
+import { encodeSourceToHash, readSourceFromHash } from './lib/share';
 import { loadSource, loadSpeed, saveSource, saveSpeed } from './lib/storage';
 import { MachineView } from './ui/machineview';
 
@@ -52,6 +53,7 @@ app.innerHTML = `
           <button type="button" class="button" id="step-button">1命令</button>
           <button type="button" class="button" id="run-button">実行</button>
           <button type="button" class="button" id="reset-button">リセット</button>
+          <button type="button" class="button" id="share-button">共有リンク</button>
           <label class="speed">
             <span>速度</span>
             <select id="speed-select">
@@ -91,7 +93,15 @@ app.innerHTML = `
 
 const editor = document.getElementById('asm-input') as HTMLTextAreaElement;
 const errorsEl = document.getElementById('errors') as HTMLUListElement;
-const view = new MachineView(document.getElementById('machine-host') as HTMLElement);
+// ブレークポイントは命令インデックスの集合。組み立て直すたびに作り直す。
+const breakpoints = new Set<number>();
+const view = new MachineView(
+  document.getElementById('machine-host') as HTMLElement,
+  (index, active) => {
+    if (active) breakpoints.add(index);
+    else breakpoints.delete(index);
+  },
+);
 
 let cpu: Cpu = createCpu();
 let program: Program | null = null;
@@ -112,6 +122,18 @@ function refreshControls(): void {
   backButton.disabled = history.length === 0;
 }
 
+const shareButton = document.getElementById('share-button') as HTMLButtonElement;
+let shareTimer: number | null = null;
+
+// 共有ボタンに一時的な手応えを出す。一定時間で元の文言へ戻す。
+function flashShare(message: string): void {
+  shareButton.textContent = message;
+  if (shareTimer !== null) window.clearTimeout(shareTimer);
+  shareTimer = window.setTimeout(() => {
+    shareButton.textContent = '共有リンク';
+  }, 1600);
+}
+
 function showErrors(errors: { line: number; message: string }[]): void {
   errorsEl.replaceChildren();
   for (const error of errors) {
@@ -128,9 +150,12 @@ function build(): void {
   program = result.program;
   cpu = createCpu();
   history.length = 0;
+  breakpoints.clear();
   view.setProgram(program, editor.value);
   view.update(cpu, null);
   saveSource(editor.value);
+  // 現在のプログラムをURLに反映しておき、そのままコピーすれば共有できる。
+  window.history.replaceState(null, '', encodeSourceToHash(editor.value));
   refreshControls();
 }
 
@@ -172,8 +197,24 @@ runButton.addEventListener('click', () => {
   if (!program) build();
   if (!program || cpu.halted) return;
   const speed = Number.parseInt(speedSelect.value, 10);
-  timer = window.setInterval(() => stepOnce(), 1000 / speed);
+  timer = window.setInterval(() => {
+    stepOnce();
+    // ブレークポイントの行に着いたら止める(その命令の手前で停止)。
+    if (!cpu.halted && breakpoints.has(cpu.pc)) pause();
+  }, 1000 / speed);
   runButton.textContent = '一時停止';
+});
+
+document.getElementById('share-button')?.addEventListener('click', async () => {
+  const url = `${location.origin}${location.pathname}${encodeSourceToHash(editor.value)}`;
+  window.history.replaceState(null, '', url);
+  try {
+    await navigator.clipboard.writeText(url);
+    flashShare('リンクをコピーした');
+  } catch {
+    // クリップボードが使えない場合でもURLは反映済み。手でコピーできる旨を伝える。
+    flashShare('URLを更新した(コピーは手動で)');
+  }
 });
 
 document.getElementById('reset-button')?.addEventListener('click', () => {
@@ -226,7 +267,8 @@ for (const button of app.querySelectorAll<HTMLButtonElement>('[data-sample]')) {
   });
 }
 
-// 前回の続きがあれば復元し、なければ最初のサンプルから始める。速度も引き継ぐ。
+// 共有リンクのソースを最優先、次に前回の続き、無ければ最初のサンプルから始める。速度も引き継ぐ。
 speedSelect.value = String(loadSpeed(Number.parseInt(speedSelect.value, 10)));
-editor.value = loadSource() ?? (samples[0] as { source: string }).source;
+editor.value =
+  readSourceFromHash(location.hash) ?? loadSource() ?? (samples[0] as { source: string }).source;
 build();
