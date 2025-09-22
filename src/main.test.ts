@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { samples } from './lib/samples';
 
 // main.ts はimport時に画面を組み立てるので、先に#appを用意してから読み込む
@@ -89,4 +89,36 @@ describe('main', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
     expect(r0Text()).toMatch(/^0 /);
   });
+
+  it('行番号ガターのクリックでブレークポイントを切り替える', () => {
+    const editor = document.getElementById('asm-input') as HTMLTextAreaElement;
+    editor.value = 'mov r0, 1\nmov r0, 2\nhalt';
+    (document.getElementById('build-button') as HTMLButtonElement).click();
+    const gutter = document.querySelectorAll<HTMLButtonElement>('.bp')[1];
+    const row = gutter?.closest('.listing-row');
+    gutter?.click();
+    expect(row?.classList.contains('breakpoint')).toBe(true);
+    expect(gutter?.getAttribute('aria-pressed')).toBe('true');
+    gutter?.click();
+    expect(row?.classList.contains('breakpoint')).toBe(false);
+  });
+
+  it('実行はブレークポイントの行で止まる', () => {
+    vi.useFakeTimers();
+    const editor = document.getElementById('asm-input') as HTMLTextAreaElement;
+    editor.value = 'mov r0, 1\nmov r0, 2\nmov r0, 3\nhalt';
+    (document.getElementById('build-button') as HTMLButtonElement).click();
+    document.querySelectorAll<HTMLButtonElement>('.bp')[2]?.click(); // 3命令目に停止点
+    const run = document.getElementById('run-button') as HTMLButtonElement;
+    run.click();
+    vi.advanceTimersByTime(1000);
+    // 停止点の手前(idx2を実行する前)で止まり、r0はまだ2のまま
+    expect(r0Text()).toContain('2');
+    expect(run.textContent).toBe('実行');
+    vi.useRealTimers();
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
